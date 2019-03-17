@@ -22,7 +22,7 @@ error () {
 # Creates a sparse $IMAGE clone of $SDCARD and attaches to $LOOPBACK
 do_create () {
     trace "Creating sparse $IMAGE, the apparent size of $SDCARD"
-    dd if=/dev/zero of=$IMAGE bs=$(blockdev --getss $SDCARD) count=0 seek=$(blockdev --getsz $SDCARD)
+    dd if=/dev/zero of=$IMAGE bs=$(blockdev --getss $SDCARD) count=0 seek=$SIZE
 
     if [ -s $IMAGE ]; then
         trace "Attaching $IMAGE to $LOOPBACK"
