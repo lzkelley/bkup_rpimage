@@ -62,7 +62,7 @@ setup () {
 	
 	BOLD=$(tput bold)
 	NOATT=$(tput sgr0)
-	MYNAME=$(basemane $0)
+	MYNAME=$(basename $0)
 }
 # Echos traces with yellow text to distinguish from other output
 trace () {
@@ -78,7 +78,7 @@ error () {
 # Creates a sparse $IMAGE clone of $SDCARD and attaches to $LOOPBACK
 do_create () {
     trace "Creating sparse $IMAGE, the apparent size of $SDCARD"
-    dd if=/dev/zero of=$IMAGE bs=$(blockdev --getss $SDCARD) count=0 seek=$SIZE
+    dd if=/dev/zero of=$IMAGE bs=$BLOCKSIZE count=0 seek=$SIZE
 
     if [ -s $IMAGE ]; then
         trace "Attaching $IMAGE to $LOOPBACK"
@@ -95,6 +95,28 @@ do_create () {
     partx --add $LOOPBACK
     mkfs.vfat -I ${LOOPBACK}p1
     mkfs.ext4 ${LOOPBACK}p2
+	
+    # cloning UUID and PARTUUID
+    UUID=$(blkid -s UUID -o value ${SDCARD}p2)
+    PTUUID=$(blkid -s PTUUID -o value ${SDCARD})
+    tune2fs ${LOOPBACK}p2 -U $UUID
+    printf 'p\nx\ni\n%s\nr\np\nw\n' 0x${PTUUID}|fdisk "${LOOPBACK}"
+
+}
+
+do_cloneid () {
+    # Check if do_create already attached the SD Image
+    if [ $(losetup -f) = $LOOPBACK ]; then
+        trace "Attaching $IMAGE to $LOOPBACK"
+        losetup $LOOPBACK $IMAGE
+        partx --add $LOOPBACK
+    fi
+    # cloning UUID and PARTUUID
+    UUID=$(blkid -s UUID -o value ${SDCARD}p2)
+    PTUUID=$(blkid -s PTUUID -o value ${SDCARD})
+    e2fsck -f -y ${LOOPBACK}p2
+    tune2fs ${LOOPBACK}p2 -U $UUID
+    printf 'p\nx\ni\n%s\nr\np\nw\n' 0x${PTUUID}|fdisk "${LOOPBACK}"
 }
 
 # Mounts the $IMAGE to $LOOPBACK (if needed) and $MOUNTDIR
@@ -235,7 +257,7 @@ setup
 
 # Read the command from command line
 case $1 in
-    start|mount|umount|gzip) 
+    start|mount|umount|gzip|cloneid) 
         opt_command=$1
         ;;
     -h|--help)
@@ -258,6 +280,7 @@ fi
 
 # Default size, can be overwritten by the -s option
 SIZE=$(blockdev --getsz $SDCARD)
+BLOCKSIZE=$(blockdev --getss $SDCARD)
 
 # Read the options from command line
 while getopts ":czdflL:i:s:" opt; do
@@ -271,7 +294,8 @@ while getopts ":czdflL:i:s:" opt; do
             LOG=$OPTARG
             ;;
         i)  SDCARD=$OPTARG;;
-        s)  SIZE=$OPTARG;;
+        s)  SIZE=$OPTARG
+            BLOCKSIZE=1M ;;
         \?) error "Invalid option: -$OPTARG\nSee '${MYNAME} --help' for usage";;
         :)  error "Option -$OPTARG requires an argument\nSee '${MYNAME} --help' for usage";;
     esac
@@ -385,6 +409,9 @@ case $opt_command in
             ;;
     gzip)
             do_compress
+            ;;
+    cloneid)
+            do_cloneid
             ;;
     *)
             error "Unknown command: $opt_command"
