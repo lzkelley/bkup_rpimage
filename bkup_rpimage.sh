@@ -86,6 +86,8 @@ clone () {
     UUID=$(blkid -s UUID -o value ${SDCARD}p2)
     PTUUID=$(blkid -s PTUUID -o value ${SDCARD})
     e2fsck -f -y ${LOOPBACK}p2
+    trace "Cloning UUID from SDCARD to $IMAGE"
+    trace "This will take a while..."
     echo y|tune2fs ${LOOPBACK}p2 -U $UUID
     printf 'p\nx\ni\n%s\nr\np\nw\n' 0x${PTUUID}|fdisk "${LOOPBACK}"
     sync
