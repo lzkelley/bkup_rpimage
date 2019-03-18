@@ -5,16 +5,21 @@
 # mounted as a filesystem in a file, allowing for efficient incremental
 # backups using rsync
 #
+# 2019-03-18 Dolorosus: 
+#               add: exclusion of files below /tmp,/proc/run also the
+#                    swapfile /var/swap will be excluded from backup.
+#               add: Bumping the version to 1.1
+#
 # 2019-03-17 Dolorosus: 
-#               add -s parameter to create an image of a defined size.
-#               add funtion cloneid to clone te UUID and the PTID from 
-#                   the SDCARD to the image. So restore is working on 
-#                   recent raspian versions.
+#               add: -s parameter to create an image of a defined size.
+#               add: funtion cloneid to clone te UUID and the PTID from 
+#                    the SDCARD to the image. So restore is working on 
+#                    recent raspian versions.
 #
 #
 #
 
-VERSION=v1.0
+VERSION=v1.1
 SDCARD=/dev/mmcblk0
 #
 
@@ -24,10 +29,10 @@ setup () {
  	GREEN=$(tput setaf 2)
 	YELLOW=$(tput setaf 3)
 	BLUE=$(tput setaf 4)
-  	MAGENTA=$(tput setaf 5)
-  	CYAN=$(tput setaf 6)
-  	WHITE=$(tput setaf 7)
-  	RESET=$(tput setaf 9)
+	MAGENTA=$(tput setaf 5)
+	CYAN=$(tput setaf 6)
+	WHITE=$(tput setaf 7)
+	RESET=$(tput setaf 9)
 	
 	BOLD=$(tput bold)
 	NOATT=$(tput sgr0)
@@ -86,8 +91,6 @@ clone () {
     UUID=$(blkid -s UUID -o value ${SDCARD}p2)
     PTUUID=$(blkid -s PTUUID -o value ${SDCARD})
     e2fsck -f -y ${LOOPBACK}p2
-    trace "Cloning UUID from SDCARD to $IMAGE"
-    trace "This will take a while, be patient..."
     echo y|tune2fs ${LOOPBACK}p2 -U $UUID
     printf 'p\nx\ni\n%s\nr\np\nw\n' 0x${PTUUID}|fdisk "${LOOPBACK}"
     sync
@@ -117,11 +120,11 @@ do_backup () {
     if mountpoint -q $MOUNTDIR; then
         trace "Starting rsync backup of / and /boot/ to $MOUNTDIR"
         if [ -n "$opt_log" ]; then
-            rsync -aEvx --del --stats --log-file $LOG /boot/ $MOUNTDIR/boot/
-            rsync -aEvx --del --stats --log-file $LOG / $MOUNTDIR/
+            rsync -aEvx --del --stats --log-file $LOG  /boot/ $MOUNTDIR/boot/
+            rsync -aEvx --del --stats --log-file $LOG --exclude={'/tmp/**','/proc/**','/run/**','/var/swap'} / $MOUNTDIR/
         else
             rsync -aEvx --del --stats /boot/ $MOUNTDIR/boot/
-            rsync -aEvx --del --stats / $MOUNTDIR/
+            rsync -aEvx --del --stats --exclude={'/tmp/**','/proc/**','/run/**','/var/swap'} / $MOUNTDIR/
         fi
     else
         trace "Skipping rsync since $MOUNTDIR is not a mount point"
