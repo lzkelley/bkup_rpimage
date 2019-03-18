@@ -4,25 +4,50 @@
 # Utility script to backup Raspberry Pi's SD Card to a sparse image file
 # mounted as a filesystem in a file, allowing for efficient incremental
 # backups using rsync
+#
+# 2019-03-17 Dolorosus: 
+#               add -s parameter to create an image of a defined size.
+#               add funtion cloneid to clone te UUID and the PTID from 
+#                   the SDCARD to the image. So restore is working on 
+#                   recent raspian versions.
+#
+#
+#
 
 VERSION=v1.0
 SDCARD=/dev/mmcblk0
+#
 
+
+setup () {
+	RED=$(tput setaf 1)
+ 	GREEN=$(tput setaf 2)
+	YELLOW=$(tput setaf 3)
+	BLUE=$(tput setaf 4)
+  	MAGENTA=$(tput setaf 5)
+  	CYAN=$(tput setaf 6)
+  	WHITE=$(tput setaf 7)
+  	RESET=$(tput setaf 9)
+	
+	BOLD=$(tput bold)
+	NOATT=$(tput sgr0)
+	MYNAME=$(basename $0)
+}
 # Echos traces with yellow text to distinguish from other output
 trace () {
-    echo -e "$(tput setaf 3)${1}$(tput sgr 0)"
+    echo -e "${YELLOW}${1}${NOATT}"
 }
 
 # Echos en error string in red text and exit
 error () {
-    echo -e "$(tput setaf 1)${1}$(tput sgr 0)" >&2
+    echo -e "${RED}${1}${NOATT}" >&2
     exit 1
 }
 
 # Creates a sparse $IMAGE clone of $SDCARD and attaches to $LOOPBACK
 do_create () {
     trace "Creating sparse $IMAGE, the apparent size of $SDCARD"
-    dd if=/dev/zero of=$IMAGE bs=$(blockdev --getss $SDCARD) count=0 seek=$(blockdev --getsz $SDCARD)
+    dd if=/dev/zero of=$IMAGE bs=$BLOCKSIZE count=0 seek=$SIZE
 
     if [ -s $IMAGE ]; then
         trace "Attaching $IMAGE to $LOOPBACK"
@@ -37,8 +62,36 @@ do_create () {
 
     trace "Formatting partitions"
     partx --add $LOOPBACK
-    mkfs.vfat -I $LOOPBACK1
-    mkfs.ext4 $LOOPBACK2
+    mkfs.vfat -I ${LOOPBACK}p1
+    mkfs.ext4 ${LOOPBACK}p2
+    clone
+
+}
+
+do_cloneid () {
+    # Check if do_create already attached the SD Image
+    if [ $(losetup -f) = $LOOPBACK ]; then
+        trace "Attaching $IMAGE to $LOOPBACK"
+        losetup $LOOPBACK $IMAGE
+        partx --add $LOOPBACK
+    fi
+    clone
+    partx --delete $LOOPBACK
+    losetup -d $LOOPBACK
+}
+
+clone () {
+
+    # cloning UUID and PARTUUID
+    UUID=$(blkid -s UUID -o value ${SDCARD}p2)
+    PTUUID=$(blkid -s PTUUID -o value ${SDCARD})
+    e2fsck -f -y ${LOOPBACK}p2
+    trace "Cloning UUID from SDCARD to $IMAGE"
+    trace "This will take a while, be patient..."
+    echo y|tune2fs ${LOOPBACK}p2 -U $UUID
+    printf 'p\nx\ni\n%s\nr\np\nw\n' 0x${PTUUID}|fdisk "${LOOPBACK}"
+    sync
+
 }
 
 # Mounts the $IMAGE to $LOOPBACK (if needed) and $MOUNTDIR
@@ -54,9 +107,9 @@ do_mount () {
     if [ ! -n "$opt_mountdir" ]; then
         mkdir $MOUNTDIR
     fi
-    mount $LOOPBACK2 $MOUNTDIR
+    mount ${LOOPBACK}p2 $MOUNTDIR
     mkdir -p $MOUNTDIR/boot
-    mount $LOOPBACK1 $MOUNTDIR/boot
+    mount ${LOOPBACK}p1 $MOUNTDIR/boot
 }
 
 # Rsyncs content of $SDCARD to $IMAGE if properly mounted
@@ -124,55 +177,62 @@ ctrl_c () {
 # Prints usage information
 usage () {
     echo -e ""
-    echo -e "$(basename $0) $VERSION by jinx"
+    echo -e "${MYNAME} $VERSION by jinx"
     echo -e ""
     echo -e "Usage:"
     echo -e ""
-    echo -e "    $(basename $0) $(tput bold)start$(tput sgr 0) [-clzdf] [-L logfile] [-i sdcard] sdimage"
-    echo -e "    $(basename $0) $(tput bold)mount$(tput sgr 0) [-c] sdimage [mountdir]"
-    echo -e "    $(basename $0) $(tput bold)umount$(tput sgr 0) sdimage [mountdir]"
-    echo -e "    $(basename $0) $(tput bold)gzip$(tput sgr 0) [-df] sdimage"
+    echo -e "    ${MYNAME} ${BOLD}start${NOATT} [-clzdf] [-L logfile] [-i sdcard] sdimage"
+    echo -e "    ${MYNAME} ${BOLD}mount${NOATT} [-c] sdimage [mountdir]"
+    echo -e "    ${MYNAME} ${BOLD}umount${NOATT} sdimage [mountdir]"
+    echo -e "    ${MYNAME} ${BOLD}gzip${NOATT} [-df] sdimage"
     echo -e ""
     echo -e "    Commands:"
     echo -e ""
-    echo -e "        $(tput bold)start$(tput sgr 0)  starts complete backup of RPi's SD Card to 'sdimage'"
-    echo -e "        $(tput bold)mount$(tput sgr 0)  mounts the 'sdimage' to 'mountdir' (default: /mnt/'sdimage'/)"
-    echo -e "        $(tput bold)umount$(tput sgr 0) unmounts the 'sdimage' from 'mountdir'"
-    echo -e "        $(tput bold)gzip$(tput sgr 0)   compresses the 'sdimage' to 'sdimage'.gz"
+    echo -e "        ${BOLD}start${NOATT}  starts complete backup of RPi's SD Card to 'sdimage'"
+    echo -e "        ${BOLD}mount${NOATT}  mounts the 'sdimage' to 'mountdir' (default: /mnt/'sdimage'/)"
+    echo -e "        ${BOLD}umount${NOATT} unmounts the 'sdimage' from 'mountdir'"
+    echo -e "        ${BOLD}gzip${NOATT}   compresses the 'sdimage' to 'sdimage'.gz"
     echo -e ""
     echo -e "    Options:"
     echo -e ""
-    echo -e "        $(tput bold)-c$(tput sgr 0)         creates the SD Image if it does not exist"
-    echo -e "        $(tput bold)-l$(tput sgr 0)         writes rsync log to 'sdimage'-YYYYmmddHHMMSS.log"
-    echo -e "        $(tput bold)-z$(tput sgr 0)         compresses the SD Image (after backup) to 'sdimage'.gz"
-    echo -e "        $(tput bold)-d$(tput sgr 0)         deletes the SD Image after successful compression"
-    echo -e "        $(tput bold)-f$(tput sgr 0)         forces overwrite of 'sdimage'.gz if it exists"
-    echo -e "        $(tput bold)-L logfile$(tput sgr 0) writes rsync log to 'logfile'"
-    echo -e "        $(tput bold)-i sdcard$(tput sgr 0)  specifies the SD Card location (default: $SDCARD)"
+    echo -e "        ${BOLD}-c${NOATT}         creates the SD Image if it does not exist"
+    echo -e "        ${BOLD}-l${NOATT}         writes rsync log to 'sdimage'-YYYYmmddHHMMSS.log"
+    echo -e "        ${BOLD}-z${NOATT}         compresses the SD Image (after backup) to 'sdimage'.gz"
+    echo -e "        ${BOLD}-d${NOATT}         deletes the SD Image after successful compression"
+    echo -e "        ${BOLD}-f${NOATT}         forces overwrite of 'sdimage'.gz if it exists"
+    echo -e "        ${BOLD}-L logfile${NOATT} writes rsync log to 'logfile'"
+    echo -e "        ${BOLD}-i sdcard${NOATT}  specifies the SD Card location (default: $SDCARD)"
+    echo -e "        ${BOLD}-s Mb${NOATT}      specifies the size of image in MB (default: Size of $SDCARD)"
     echo -e ""
     echo -e "Examples:"
     echo -e ""
-    echo -e "    $(basename $0) start -c /path/to/rpi_backup.img"
+    echo -e "    ${MYNAME} start -c /path/to/rpi_backup.img"
     echo -e "        starts backup to 'rpi_backup.img', creating it if it does not exist"
     echo -e ""
-    echo -e "    $(basename $0) start /path/to/\$(uname -n).img"
+    echo -e "    ${MYNAME} start -c -s 8000 /path/to/rpi_backup.img"
+    echo -e "        starts backup to 'rpi_backup.img', creating it" 
+    echo -e "        with a size of 8000mb if it does not exist"
+    echo -e ""
+    echo -e "    ${MYNAME} start /path/to/\$(uname -n).img"
     echo -e "        uses the RPi's hostname as the SD Image filename"
     echo -e ""
-    echo -e "    $(basename $0) start -cz /path/to/\$(uname -n)-\$(date +%Y-%m-%d).img"
+    echo -e "    ${MYNAME} start -cz /path/to/\$(uname -n)-\$(date +%Y-%m-%d).img"
     echo -e "        uses the RPi's hostname and today's date as the SD Image filename,"
     echo -e "        creating it if it does not exist, and compressing it after backup"
     echo -e ""
-    echo -e "    $(basename $0) mount /path/to/\$(uname -n).img /mnt/rpi_image"
+    echo -e "    ${MYNAME} mount /path/to/\$(uname -n).img /mnt/rpi_image"
     echo -e "        mounts the RPi's SD Image in /mnt/rpi_image"
     echo -e ""
-    echo -e "    $(basename $0) umount /path/to/raspi-$(date +%Y-%m-%d).img"
+    echo -e "    ${MYNAME} umount /path/to/raspi-$(date +%Y-%m-%d).img"
     echo -e "        unmounts the SD Image from default mountdir (/mnt/raspi-$(date +%Y-%m-%d).img/)"
     echo -e ""
 }
 
+setup
+
 # Read the command from command line
 case $1 in
-    start|mount|umount|gzip) 
+    start|mount|umount|gzip|cloneid) 
         opt_command=$1
         ;;
     -h|--help)
@@ -180,11 +240,11 @@ case $1 in
         exit 0
         ;;
     --version)
-        trace "$(basename $0) $VERSION by jinx"
+        trace "${MYNAME} $VERSION by jinx"
         exit 0
         ;;
     *)
-        error "Invalid command or option: $1\nSee '$(basename $0) --help' for usage";;
+        error "Invalid command or option: $1\nSee '${MYNAME} --help' for usage";;
 esac
 shift 1
 
@@ -193,8 +253,12 @@ if [ $(id -u) -ne 0 ]; then
     error "Please run as root. Try sudo."
 fi
 
+# Default size, can be overwritten by the -s option
+SIZE=$(blockdev --getsz $SDCARD)
+BLOCKSIZE=$(blockdev --getss $SDCARD)
+
 # Read the options from command line
-while getopts ":czdflL:i:" opt; do
+while getopts ":czdflL:i:s:" opt; do
     case $opt in
         c)  opt_create=1;;
         z)  opt_compress=1;;
@@ -205,8 +269,10 @@ while getopts ":czdflL:i:" opt; do
             LOG=$OPTARG
             ;;
         i)  SDCARD=$OPTARG;;
-        \?) error "Invalid option: -$OPTARG\nSee '$(basename $0) --help' for usage";;
-        :)  error "Option -$OPTARG requires an argument\nSee '$(basename $0) --help' for usage";;
+        s)  SIZE=$OPTARG
+            BLOCKSIZE=1M ;;
+        \?) error "Invalid option: -$OPTARG\nSee '${MYNAME} --help' for usage";;
+        :)  error "Option -$OPTARG requires an argument\nSee '${MYNAME} --help' for usage";;
     esac
 done
 shift $((OPTIND-1))
@@ -251,8 +317,7 @@ elif [ ! -z $LOOPBACK ]; then
 else
     LOOPBACK=$(losetup -f)
 fi
-LOOPBACK1=${LOOPBACK}p1
-LOOPBACK2=${LOOPBACK}p2
+
 
 # Read the optional mountdir from command line
 MOUNTDIR=$2
@@ -319,6 +384,9 @@ case $opt_command in
             ;;
     gzip)
             do_compress
+            ;;
+    cloneid)
+            do_cloneid
             ;;
     *)
             error "Unknown command: $opt_command"
