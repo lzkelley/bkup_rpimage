@@ -6,8 +6,8 @@
 # backups using rsync
 #
 # 2019-03-18 Dolorosus: 
-#               add: exclusion of files below /tmp,/proc/run also the
-#                    swapfile /var/swap will be excluded from backup.
+#               add: exclusion of files below /tmp,/proc,/run,/sys and 
+#                    also the swapfile /var/swap will be excluded from backup.
 #               add: Bumping the version to 1.1
 #
 # 2019-03-17 Dolorosus: 
@@ -121,10 +121,10 @@ do_backup () {
         trace "Starting rsync backup of / and /boot/ to $MOUNTDIR"
         if [ -n "$opt_log" ]; then
             rsync -aEvx --del --stats --log-file $LOG  /boot/ $MOUNTDIR/boot/
-            rsync -aEvx --del --stats --log-file $LOG --exclude={'/tmp/**','/proc/**','/run/**','/var/swap'} / $MOUNTDIR/
+            rsync -aEvx --del --stats --log-file $LOG --exclude={'tmp/**','proc/**','run/**','sys/**','var/swap'} / $MOUNTDIR/
         else
             rsync -aEvx --del --stats /boot/ $MOUNTDIR/boot/
-            rsync -aEvx --del --stats --exclude={'/tmp/**','/proc/**','/run/**','/var/swap'} / $MOUNTDIR/
+            rsync -aEvx --del --stats --exclude={'tmp/**','proc/**','run/**','sys/**','var/swap'} / $MOUNTDIR/
         fi
     else
         trace "Skipping rsync since $MOUNTDIR is not a mount point"
