@@ -374,7 +374,7 @@ else
 fi
 
 # Trap keyboard interrupt (ctrl-c)
-trap ctrl_c SIGINT
+trap ctrl_c SIGINT SIGTERM
 
 # Check for dependencies
 for c in dd losetup parted sfdisk partx mkfs.vfat mkfs.ext4 mountpoint rsync; do
