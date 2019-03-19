@@ -14,6 +14,10 @@
 #  starting the backup. After the backup terminates normally you may restart all stopped
 #  applications or just reboot the system. 
 #
+# 2019-03-19 Dolorosus                  
+#		 fix: Define colors only if connected to a terminal.
+# 		      Thus output to file is no more cluttered.
+#
 # 2019-03-18 Dolorosus: 
 #               add: exclusion of files below /tmp,/proc,/run,/sys and 
 #                    also the swapfile /var/swap will be excluded from backup.
@@ -30,23 +34,39 @@
 
 VERSION=v1.1
 SDCARD=/dev/mmcblk0
-#
-
 
 setup () {
-	RED=$(tput setaf 1)
- 	GREEN=$(tput setaf 2)
-	YELLOW=$(tput setaf 3)
-	BLUE=$(tput setaf 4)
-	MAGENTA=$(tput setaf 5)
-	CYAN=$(tput setaf 6)
-	WHITE=$(tput setaf 7)
-	RESET=$(tput setaf 9)
-	
-	BOLD=$(tput bold)
-	NOATT=$(tput sgr0)
-	MYNAME=$(basename $0)
+	#
+	# Define some fancy colors only if connected to a terminal.
+	# Thus output to file is no more cluttered
+	#
+        [ -t 1 ] && {
+                RED=$(tput setaf 1)
+                GREEN=$(tput setaf 2)
+                YELLOW=$(tput setaf 3)
+                BLUE=$(tput setaf 4)
+                MAGENTA=$(tput setaf 5)
+                CYAN=$(tput setaf 6)
+                WHITE=$(tput setaf 7)
+                RESET=$(tput setaf 9)
+                BOLD=$(tput bold)
+                NOATT=$(tput sgr0)
+				}||{
+                RED=""
+                GREEN=""
+                YELLOW=""
+                BLUE=""
+                MAGENTA=""
+                CYAN=""
+                WHITE=""
+                RESET=""
+                BOLD=""
+                NOATT=""
+				}
+        MYNAME=$(basename $0)
 }
+
+
 # Echos traces with yellow text to distinguish from other output
 trace () {
     echo -e "${YELLOW}${1}${NOATT}"
