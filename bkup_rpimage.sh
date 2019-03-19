@@ -19,7 +19,7 @@
 # 		      Thus output to file is no more cluttered.
 #
 # 2019-03-18 Dolorosus: 
-#               add: exclusion of files below /tmp,/proc,/run,/sys and 
+#               add: exclusion of files below /tmp,/proc,/run,/sys./mnt and 
 #                    also the swapfile /var/swap will be excluded from backup.
 #               add: Bumping the version to 1.1
 #
@@ -51,7 +51,7 @@ setup () {
                 RESET=$(tput setaf 9)
                 BOLD=$(tput bold)
                 NOATT=$(tput sgr0)
-				}||{
+	}||{
                 RED=""
                 GREEN=""
                 YELLOW=""
@@ -62,7 +62,7 @@ setup () {
                 RESET=""
                 BOLD=""
                 NOATT=""
-				}
+	}
         MYNAME=$(basename $0)
 }
 
@@ -150,10 +150,10 @@ do_backup () {
         trace "Starting rsync backup of / and /boot/ to $MOUNTDIR"
         if [ -n "$opt_log" ]; then
             rsync -aEvx --del --stats --log-file $LOG  /boot/ $MOUNTDIR/boot/
-            rsync -aEvx --del --stats --log-file $LOG --exclude={'tmp/**','proc/**','run/**','sys/**','var/swap'} / $MOUNTDIR/
+            rsync -aEvx --del --stats --log-file $LOG --exclude={'tmp/**','proc/**','run/**','sys/**','mnt/**','var/swap'} / $MOUNTDIR/
         else
             rsync -aEvx --del --stats /boot/ $MOUNTDIR/boot/
-            rsync -aEvx --del --stats --exclude={'tmp/**','proc/**','run/**','sys/**','var/swap'} / $MOUNTDIR/
+            rsync -aEvx --del --stats --exclude={'tmp/**','proc/**','run/**','sys/**','mnt/**','var/swap'} / $MOUNTDIR/
         fi
     else
         trace "Skipping rsync since $MOUNTDIR is not a mount point"
