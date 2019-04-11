@@ -82,6 +82,11 @@ do_create () {
 	trace "Not implemented! Use a mmcBackup image as base"
 	exit 1
 	
+	#
+	# I've no idea why a sdcard created (code below) won't boot
+	# Until this will work I've to use an mmcBackup as base.
+	# 
+	#
 	
 	export BLOCKSIZE=1M
 	export SIZE=7900
