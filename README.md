@@ -36,7 +36,7 @@ bkup_rpimage.sh v1.0 by jinx
 * -d deletes the SD Image after successful compression
 * -f forces overwrite of 'sdimage'.gz if it exists
 * -L logfile writes rsync log to 'logfile'
-* -i sdcard specifies the SD Card location (default: /dev/mmcblk0)
+* -s define the size of the image file
 
 ### Examples:
 
@@ -44,6 +44,13 @@ Start backup to `rpi_backup.img`, creating it if it does not exist:
 ```
 bkup_rpimage.sh start -c /path/to/rpi_backup.img
 ```
+
+Start backup to `rpi_backup.img`, creating it if it does not exist limiting 
+ the size to 8000Mb
+```
+bkup_rpimage.sh start -s 8000 -c /path/to/rpi_backup.img
+```
+
 
 Use the RPi's hostname as the SD Image filename:
 ```
