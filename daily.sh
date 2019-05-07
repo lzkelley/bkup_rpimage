@@ -1,11 +1,12 @@
-
+#!/bin/bash
 #
-#	Script for daily backup
+#	*EXAMPLE* Script for daily backup
 #	
 #	Before the backup takes place a snapshot of the current backupfile is taken.
-#	This is done by calling a script $snapscript.
+#	This is done by calling a script $snapscript. 
 #	Using a snapshot supporting filesystem (btrfs,xfs...) is recommended 
-#	for the backupdestination.
+#	for the backupdestination. If BTRFS is used you may have a look to 
+#           https://github.com/dolorosus/btrfs-snapshot-rotation
 #
 #	After the snapshot is taken, most of the active services are shutdown.
 #	You should adapt the function *progs()* according your needs.
@@ -144,17 +145,20 @@ do_backup () {
 	msg "Backupfile is_: ${destpath}/${bcknewname}"
 	return 0
 }
-#
-#
+
 # ===============================================================================================================
 # Main
 # ===============================================================================================================
 
+#
+# Please, do not disturb
+#
 trap "progs start" SIGTERM SIGINT
 
 setup
+
 #
-#	Bailout in case of error
+# Bailout in case of uncought error
 #
 set -e
 
@@ -163,10 +167,10 @@ set -e
   do_backup -c
   exit 0
 }
+
 #
-#	some checks if setup is done well
+#	some checks 
 #
- 
 [ "$(ls -1 ${destpath}/${destpatt}|wc -l)" == "1" ] || errexit 10
 
 bckfile="$(ls -1 ${destpath}/${destpatt})" 
@@ -177,16 +181,17 @@ bckfile="$(ls -1 ${destpath}/${destpatt})"
 [ -x "${snapscript}" ] || errexit 21
 
 #
-# All tests ok, let's move on
-#
-
-#
 # create a snapshot of current state
 #
-
 ${snapscript}  ${destpath} ${destvol}/.snapshots/BACKUPS ${mark} ${versions}
 
+#
+# Finally do the backup
+#
 do_backup
 
+#
+# All's Well That Ends Well
+#
 exit 0
 
