@@ -16,7 +16,7 @@ bkup_rpimage.sh v1.0 by jinx
 
 ### Usage:
 
-* bkup_rpimage.sh start [-clzdf] [-L logfile] [-i sdcard] sdimage
+* bkup_rpimage.sh start [-cslzdf] [-L logfile] sdimage
 * bkup_rpimage.sh mount [-c] sdimage [mountdir]
 * bkup_rpimage.sh umount sdimage [mountdir]
 * bkup_rpimage.sh gzip [-df] sdimage
